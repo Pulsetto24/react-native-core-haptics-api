@@ -24,6 +24,7 @@ class HapticPatternObject {
     class Key {
         // HapticPattern
         static let hapticEvents = "hapticEvents"
+        static let parameterCurves = "parameterCurves"
         
         // HapticEvent
         static let eventType = "eventType"
@@ -95,9 +96,36 @@ class HapticPatternObject {
             let event = CHHapticEvent(eventType: eventType, parameters: eventParameters, relativeTime: relativeTime, duration: duration)
             return event
         }
+
+        var curves: [CHHapticParameterCurve] = []
+
         
+        if let jsonCurves = parameterCurves {
+            for curve in jsonCurves {
+                guard let paramIDObject = curve[Key.parameterID] as? [String: Any],
+                      let paramIDRaw = paramIDObject[Key.rawValue] as? String,
+                      let controlPoints = curve[Key.controlPoints] as? [[String: Any]] else {
+                    continue
+                }
+
+                let parameterID = CHHapticEvent.ParameterID(rawValue: paramIDRaw)
+
+                let points: [CHHapticParameterCurve.ControlPoint] = controlPoints.compactMap { point in
+                    guard let time = point[Key.time] as? TimeInterval,
+                          let value = point[Key.value] as? Float else {
+                        return nil
+                    }
+
+                    return CHHapticParameterCurve.ControlPoint(relativeTime: time, value: value)
+                }
+
+                let paramCurve = CHHapticParameterCurve(parameterID: parameterID, controlPoints: points, relativeTime: 0)
+                curves.append(paramCurve)
+            }
+        }
+
         do {
-            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let pattern = try CHHapticPattern(events: events, parameterCurves: curves)
             return pattern
         } catch let _ {
             return nil
