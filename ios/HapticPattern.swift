@@ -119,8 +119,9 @@ class HapticPatternObject {
                        let parameterID = CHHapticDynamicParameter.ID(rawValue: paramIDRaw)
 
                        let points: [CHHapticParameterCurve.ControlPoint] = controlPoints.compactMap { point in
-                           guard let time = point[Key.time] as? TimeInterval,
-                                 let value = point[Key.value] as? Float else {
+                           guard let time = (point[Key.time] as? NSNumber)?.doubleValue,
+                                 let value = (point[Key.value] as? NSNumber)?.floatValue else {
+                               print("⚠️ Skipping controlPoint with invalid types: \(point)")
                                return nil
                            }
 
