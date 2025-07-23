@@ -38,6 +38,10 @@ class HapticPatternObject {
         
         // HapticEventEventType, HapticEventParameterID
         static let rawValue = "rawValue"
+        
+        // Parameter Curves
+        static let controlPoints = "controlPoints"
+        static let time = "time"
     }
     
     let json: [String: Any]
@@ -47,6 +51,10 @@ class HapticPatternObject {
     
     var hapticEvents: [[String: Any]]? {
         return self.json[Key.hapticEvents] as? [[String: Any]]
+    }
+    
+    var parameterCurves: [[String: Any]]? {
+        return self.json[Key.parameterCurves] as? [[String: Any]]
     }
     
     func toHapticPattern() -> CHHapticPattern? {
@@ -96,34 +104,34 @@ class HapticPatternObject {
             let event = CHHapticEvent(eventType: eventType, parameters: eventParameters, relativeTime: relativeTime, duration: duration)
             return event
         }
+        // ✅ NEW: Handle parameter curves
+               var curves: [CHHapticParameterCurve] = []
 
-        var curves: [CHHapticParameterCurve] = []
+               if let jsonCurves = parameterCurves {
+                   for curve in jsonCurves {
+                       guard let paramIDObject = curve[Key.parameterID] as? [String: Any],
+                             let paramIDRaw = paramIDObject[Key.rawValue] as? String,
+                             let relativeTime = curve[Key.relativeTime] as? TimeInterval,
+                             let controlPoints = curve[Key.controlPoints] as? [[String: Any]] else {
+                           continue
+                       }
 
+                       let parameterID = CHHapticDynamicParameter.ID(rawValue: paramIDRaw)
+
+                       let points: [CHHapticParameterCurve.ControlPoint] = controlPoints.compactMap { point in
+                           guard let time = point[Key.time] as? TimeInterval,
+                                 let value = point[Key.value] as? Float else {
+                               return nil
+                           }
+
+                           return CHHapticParameterCurve.ControlPoint(relativeTime: time, value: value)
+                       }
+
+                       let curveObject = CHHapticParameterCurve(parameterID: parameterID, controlPoints: points, relativeTime: relativeTime)
+                       curves.append(curveObject)
+                   }
+               }
         
-        if let jsonCurves = parameterCurves {
-            for curve in jsonCurves {
-                guard let paramIDObject = curve[Key.parameterID] as? [String: Any],
-                      let paramIDRaw = paramIDObject[Key.rawValue] as? String,
-                      let controlPoints = curve[Key.controlPoints] as? [[String: Any]] else {
-                    continue
-                }
-
-                let parameterID = CHHapticEvent.ParameterID(rawValue: paramIDRaw)
-
-                let points: [CHHapticParameterCurve.ControlPoint] = controlPoints.compactMap { point in
-                    guard let time = point[Key.time] as? TimeInterval,
-                          let value = point[Key.value] as? Float else {
-                        return nil
-                    }
-
-                    return CHHapticParameterCurve.ControlPoint(relativeTime: time, value: value)
-                }
-
-                let paramCurve = CHHapticParameterCurve(parameterID: parameterID, controlPoints: points, relativeTime: 0)
-                curves.append(paramCurve)
-            }
-        }
-
         do {
             let pattern = try CHHapticPattern(events: events, parameterCurves: curves)
             return pattern
